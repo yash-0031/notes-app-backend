@@ -18,7 +18,14 @@ class BaseConfig:
     CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     RATELIMIT_STORAGE_URI = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB max upload size
+    MAX_CONTENT_LENGTH = 10 * 1024 * 1024  
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_size": 5,
+        "max_overflow": 10,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+        "pool_pre_ping": True, 
+    }
 
 class DevelopmentConfig(BaseConfig):
     DEBUG = True

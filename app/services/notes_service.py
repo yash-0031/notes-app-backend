@@ -39,6 +39,9 @@ class NotesService:
         db.session.add(note)
         db.session.commit()
 
+        from app.tasks.embedding_tasks import generate_embeddings
+        generate_embeddings.delay(str(note.id))
+
         return note
 
     @staticmethod
@@ -125,6 +128,10 @@ class NotesService:
             note.is_archived = kwargs["is_archived"]
 
         db.session.commit()
+
+        if "content" in kwargs:
+            from app.tasks.embedding_tasks import generate_embeddings
+            generate_embeddings.delay(str(note.id))
 
         return note
 

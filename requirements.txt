@@ -5,6 +5,7 @@ Flask-RESTful==0.3.10
 # Database
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.7
+psycopg2-binary==2.9.10
 pgvector==0.3.6
 
 # Authentication

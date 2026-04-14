@@ -1,0 +1,15 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+.env
+.git/
+.gitignore
+*.md
+celerybeat-schedule
+.DS_Store

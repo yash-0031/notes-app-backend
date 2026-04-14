@@ -1,0 +1,22 @@
+services:
+  web:
+    command: flask --app wsgi run --host=0.0.0.0 --port=5000 --reload
+    environment:
+      FLASK_ENV: development
+      FLASK_DEBUG: "1"
+    volumes:
+      - .:/app
+
+  celery_worker:
+    command: celery -A app.tasks:celery_app worker --loglevel=debug --concurrency=1
+    volumes:
+      - .:/app
+
+  celery_beat:
+    command: celery -A app.tasks:celery_app beat --loglevel=debug
+    volumes:
+      - .:/app
+
+  nginx:
+    profiles:
+      - prod-only

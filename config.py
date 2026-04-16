@@ -17,6 +17,9 @@ class BaseConfig:
     CELERY_BROKER_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CELERY_RESULT_BACKEND = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    AI_QUERY_MAX_NOTES = int(os.getenv("AI_QUERY_MAX_NOTES", "50"))
+    AI_QUERY_SUMMARY_CHUNK_LIMIT = int(os.getenv("AI_QUERY_SUMMARY_CHUNK_LIMIT", "20"))
+    AI_QUERY_MAX_CONTEXT_CHARS = int(os.getenv("AI_QUERY_MAX_CONTEXT_CHARS", "12000"))
     RATELIMIT_STORAGE_URI = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     MAX_CONTENT_LENGTH = 10 * 1024 * 1024  
     SQLALCHEMY_ENGINE_OPTIONS = {

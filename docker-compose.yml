@@ -38,6 +38,9 @@ services:
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AI_QUERY_MAX_NOTES: ${AI_QUERY_MAX_NOTES:-50}
+      AI_QUERY_SUMMARY_CHUNK_LIMIT: ${AI_QUERY_SUMMARY_CHUNK_LIMIT:-20}
+      AI_QUERY_MAX_CONTEXT_CHARS: ${AI_QUERY_MAX_CONTEXT_CHARS:-12000}
     depends_on:
       db:
         condition: service_healthy
@@ -54,6 +57,9 @@ services:
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AI_QUERY_MAX_NOTES: ${AI_QUERY_MAX_NOTES:-50}
+      AI_QUERY_SUMMARY_CHUNK_LIMIT: ${AI_QUERY_SUMMARY_CHUNK_LIMIT:-20}
+      AI_QUERY_MAX_CONTEXT_CHARS: ${AI_QUERY_MAX_CONTEXT_CHARS:-12000}
     depends_on:
       db:
         condition: service_healthy
@@ -71,6 +77,9 @@ services:
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      AI_QUERY_MAX_NOTES: ${AI_QUERY_MAX_NOTES:-50}
+      AI_QUERY_SUMMARY_CHUNK_LIMIT: ${AI_QUERY_SUMMARY_CHUNK_LIMIT:-20}
+      AI_QUERY_MAX_CONTEXT_CHARS: ${AI_QUERY_MAX_CONTEXT_CHARS:-12000}
     depends_on:
       db:
         condition: service_healthy

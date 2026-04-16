@@ -1,5 +1,7 @@
 import re
 
+from flask import current_app
+
 from app import db
 from app.models import Note, NoteEmbedding, Share, User
 from app.utils.permissions import get_accessible_note_ids
@@ -7,6 +9,43 @@ from app.utils.ai_helper import get_embedding, generate_answer
 
 
 class QueryService:
+    @staticmethod
+    def _get_query_setting(name: str, default: int) -> int:
+        value = current_app.config.get(name, default)
+        try:
+            return max(int(value), 1)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _get_search_window_limit() -> int:
+        return QueryService._get_query_setting("AI_QUERY_MAX_NOTES", 50)
+
+    @staticmethod
+    def _get_summary_chunk_limit() -> int:
+        return QueryService._get_query_setting("AI_QUERY_SUMMARY_CHUNK_LIMIT", 20)
+
+    @staticmethod
+    def _get_context_budget() -> int:
+        return QueryService._get_query_setting("AI_QUERY_MAX_CONTEXT_CHARS", 12000)
+
+    @staticmethod
+    def _get_searchable_note_ids(user_id: str) -> tuple[list, int, int]:
+        accessible_note_ids = list(dict.fromkeys(get_accessible_note_ids(user_id)))
+        if not accessible_note_ids:
+            return [], 0, QueryService._get_search_window_limit()
+
+        window_limit = QueryService._get_search_window_limit()
+        searchable_note_ids = [
+            row[0]
+            for row in db.session.query(Note.id)
+            .filter(Note.id.in_(accessible_note_ids))
+            .order_by(Note.updated_at.desc(), Note.created_at.desc())
+            .limit(window_limit)
+            .all()
+        ]
+        return searchable_note_ids, len(accessible_note_ids), window_limit
+
     @staticmethod
     def _extract_shared_by_filter(question: str) -> str | None:
         patterns = [
@@ -102,8 +141,7 @@ class QueryService:
 
     @staticmethod
     def get_index_status(user_id: str) -> dict:
-
-        accessible_note_ids = get_accessible_note_ids(user_id)
+        accessible_note_ids, accessible_total, search_window_limit = QueryService._get_searchable_note_ids(user_id)
 
         if not accessible_note_ids:
             return {
@@ -111,6 +149,8 @@ class QueryService:
                 "indexed_notes": 0,
                 "pending_notes": 0,
                 "is_ready": False,
+                "search_window_limit": search_window_limit,
+                "accessible_total_notes": accessible_total,
             }
 
         total_notes = (
@@ -134,12 +174,13 @@ class QueryService:
             "indexed_notes": indexed_notes,
             "pending_notes": pending_notes,
             "is_ready": total_notes > 0 and pending_notes == 0,
+            "search_window_limit": search_window_limit,
+            "accessible_total_notes": accessible_total,
         }
 
     @staticmethod
     def query(user_id: str, question: str, top_k: int = 5) -> dict:
-
-        accessible_note_ids = get_accessible_note_ids(user_id)
+        accessible_note_ids, _, _ = QueryService._get_searchable_note_ids(user_id)
 
         if not accessible_note_ids:
             return {
@@ -161,11 +202,15 @@ class QueryService:
 
         if QueryService._is_broad_summary_request(question):
             similar_chunks = (
-                db.session.query(NoteEmbedding, db.literal(0.0).label("distance"))
+                db.session.query(
+                    NoteEmbedding,
+                    db.literal(0.0).label("distance"),
+                    Note.title.label("note_title"),
+                )
                 .join(Note, Note.id == NoteEmbedding.note_id)
                 .filter(NoteEmbedding.note_id.in_(filtered_note_ids))
                 .order_by(Note.updated_at.desc())
-                .limit(max(top_k, 20))
+                .limit(max(top_k, QueryService._get_summary_chunk_limit()))
                 .all()
             )
         else:
@@ -175,7 +220,9 @@ class QueryService:
                 db.session.query(
                     NoteEmbedding,
                     NoteEmbedding.embedding.cosine_distance(question_vector).label("distance"),
+                    Note.title.label("note_title"),
                 )
+                .join(Note, Note.id == NoteEmbedding.note_id)
                 .filter(NoteEmbedding.note_id.in_(filtered_note_ids))
                 .order_by("distance")
                 .limit(top_k)
@@ -190,21 +237,39 @@ class QueryService:
         
         context_pieces = []
         sources = []
+        context_length = 0
+        context_budget = QueryService._get_context_budget()
 
-        for chunk, distance in similar_chunks:
-            note = Note.query.get(chunk.note_id)
-            note_title = note.title if note else "Unknown Note"
+        for chunk, distance, note_title in similar_chunks:
+            resolved_title = note_title or "Unknown Note"
+            prefix = f"[From note: {resolved_title}]\n"
+            remaining_budget = context_budget - context_length - len(prefix)
+            if remaining_budget <= 0:
+                break
 
-            context_pieces.append(
-                f"[From note: {note_title}]\n{chunk.chunk_text}"
-            )
+            chunk_text = chunk.chunk_text
+            if len(chunk_text) > remaining_budget:
+                if context_pieces:
+                    break
+                chunk_text = chunk_text[:remaining_budget].rstrip()
+
+            snippet = f"{prefix}{chunk_text}"
+
+            context_pieces.append(snippet)
+            context_length += len(snippet)
 
             sources.append({
                 "note_id": str(chunk.note_id),
-                "note_title": note_title,
+                "note_title": resolved_title,
                 "chunk_text": chunk.chunk_text[:200] + "..." if len(chunk.chunk_text) > 200 else chunk.chunk_text,
                 "similarity_score": round(1 - distance, 4),
             })
+
+        if not context_pieces:
+            return {
+                "answer": "Your notes matched, but the relevant context was too large to process. Please narrow the question or update the AI search limits.",
+                "sources": [],
+            }
 
         context = "\n\n---\n\n".join(context_pieces)
 

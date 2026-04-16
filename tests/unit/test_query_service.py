@@ -1,5 +1,7 @@
+from datetime import datetime, timedelta, timezone
+
 from app import db
-from app.models import NoteEmbedding, Share, PermissionType
+from app.models import Note, NoteEmbedding, Share, PermissionType
 from app.services.auth_service import AuthService
 from app.services.notes_service import NotesService
 from app.services.query_service import QueryService
@@ -141,3 +143,103 @@ def test_query_uses_summary_fallback_when_model_returns_no_text(mock_openai):
 
     assert result["answer"].startswith("Here is a summary from the matching shared notes:")
     assert "Cloud Lab Viva" in result["answer"]
+
+
+def test_query_respects_latest_note_window(app, mock_openai):
+    app.config["AI_QUERY_MAX_NOTES"] = 2
+
+    user = _register_user("latest-window@example.com", "Latest Window")
+
+    first_note = NotesService.create_note(
+        user_id=str(user.id),
+        title="Old Note",
+        content="Old context that should be excluded from AI search.",
+    )
+    second_note = NotesService.create_note(
+        user_id=str(user.id),
+        title="Recent Note",
+        content="Recent context that should stay searchable.",
+    )
+    third_note = NotesService.create_note(
+        user_id=str(user.id),
+        title="Newest Note",
+        content="Newest context that should stay searchable.",
+    )
+
+    base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    Note.query.filter_by(id=first_note.id).update({"updated_at": base_time})
+    Note.query.filter_by(id=second_note.id).update({"updated_at": base_time + timedelta(days=1)})
+    Note.query.filter_by(id=third_note.id).update({"updated_at": base_time + timedelta(days=2)})
+
+    db.session.add_all(
+        [
+            NoteEmbedding(
+                note_id=first_note.id,
+                chunk_text="Old context that should be excluded from AI search.",
+                embedding=[0.1] * 1536,
+                metadata_={"chunk_index": 0},
+            ),
+            NoteEmbedding(
+                note_id=second_note.id,
+                chunk_text="Recent context that should stay searchable.",
+                embedding=[0.1] * 1536,
+                metadata_={"chunk_index": 0},
+            ),
+            NoteEmbedding(
+                note_id=third_note.id,
+                chunk_text="Newest context that should stay searchable.",
+                embedding=[0.1] * 1536,
+                metadata_={"chunk_index": 0},
+            ),
+        ]
+    )
+    db.session.commit()
+
+    result = QueryService.query(
+        user_id=str(user.id),
+        question="Summarize everything in my notes",
+        top_k=5,
+    )
+
+    returned_titles = {source["note_title"] for source in result["sources"]}
+    assert returned_titles == {"Recent Note", "Newest Note"}
+
+
+def test_get_index_status_reports_search_window(app):
+    app.config["AI_QUERY_MAX_NOTES"] = 1
+
+    user = _register_user("status-window@example.com", "Status Window")
+
+    older_note = NotesService.create_note(
+        user_id=str(user.id),
+        title="Older Indexed Note",
+        content="This note is already indexed.",
+    )
+    newer_note = NotesService.create_note(
+        user_id=str(user.id),
+        title="Newest Pending Note",
+        content="This note should be in the active AI window.",
+    )
+
+    base_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    Note.query.filter_by(id=older_note.id).update({"updated_at": base_time})
+    Note.query.filter_by(id=newer_note.id).update({"updated_at": base_time + timedelta(days=1)})
+
+    db.session.add(
+        NoteEmbedding(
+            note_id=older_note.id,
+            chunk_text="This note is already indexed.",
+            embedding=[0.1] * 1536,
+            metadata_={"chunk_index": 0},
+        )
+    )
+    db.session.commit()
+
+    status = QueryService.get_index_status(user_id=str(user.id))
+
+    assert status["search_window_limit"] == 1
+    assert status["accessible_total_notes"] == 2
+    assert status["total_notes"] == 1
+    assert status["indexed_notes"] == 0
+    assert status["pending_notes"] == 1
+    assert status["is_ready"] is False

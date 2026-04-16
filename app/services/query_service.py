@@ -1,6 +1,7 @@
 import re
 
 from flask import current_app
+from sqlalchemy.orm import aliased
 
 from app import db
 from app.models import Note, NoteEmbedding, Share, User
@@ -9,6 +10,14 @@ from app.utils.ai_helper import get_embedding, generate_answer
 
 
 class QueryService:
+    SELF_REFERENCES = {"i", "me", "my", "myself"}
+
+    @staticmethod
+    def _normalize_question(question: str) -> str:
+        normalized = question.strip()
+        normalized = re.sub(r"^\s*from\s+[a-zA-Z0-9_.@ -]+\s*:\s*", "", normalized, flags=re.IGNORECASE)
+        return normalized
+
     @staticmethod
     def _get_query_setting(name: str, default: int) -> int:
         value = current_app.config.get(name, default)
@@ -51,6 +60,9 @@ class QueryService:
         patterns = [
             r"shared by\s+([a-zA-Z0-9_.@ -]+)",
             r"from\s+([a-zA-Z0-9_.@ -]+)\s+that (?:was|were)\s+shared",
+            r"did\s+([a-zA-Z0-9_.@ -]+)\s+share(?:\s+with\b|$)",
+            r"what\s+(?:did|has)\s+([a-zA-Z0-9_.@ -]+)\s+share(?:\s+with\b|$)",
+            r"which\s+notes\s+did\s+([a-zA-Z0-9_.@ -]+)\s+share(?:\s+with\b|$)",
         ]
 
         lowered = question.lower()
@@ -59,6 +71,181 @@ class QueryService:
             if match:
                 return match.group(1).strip(" .?!,")
         return None
+
+    @staticmethod
+    def _extract_shared_with_filter(question: str) -> str | None:
+        patterns = [
+            r"shared with\s+([a-zA-Z0-9_.@ -]+)",
+            r"share with\s+([a-zA-Z0-9_.@ -]+)",
+            r"with\s+([a-zA-Z0-9_.@ -]+)\s*$",
+        ]
+
+        lowered = question.lower()
+        for pattern in patterns:
+            match = re.search(pattern, lowered)
+            if match:
+                return match.group(1).strip(" .?!,:;")
+        return None
+
+    @staticmethod
+    def _is_share_listing_request(question: str) -> bool:
+        lowered = question.lower()
+        share_terms = ["share", "shared"]
+        list_terms = [
+            "which notes",
+            "what notes",
+            "list",
+            "show",
+            "tell me",
+            "what did",
+            "which did",
+        ]
+        return any(term in lowered for term in share_terms) and any(term in lowered for term in list_terms)
+
+    @staticmethod
+    def _build_share_listing_response(question: str, user_id: str) -> dict | None:
+        normalized_question = QueryService._normalize_question(question)
+        if not QueryService._is_share_listing_request(normalized_question):
+            return None
+
+        shared_by = QueryService._extract_shared_by_filter(normalized_question)
+        shared_with = QueryService._extract_shared_with_filter(normalized_question)
+        lowered = normalized_question.lower()
+
+        if shared_by in QueryService.SELF_REFERENCES:
+            shared_by = None
+        if shared_with in QueryService.SELF_REFERENCES:
+            shared_with = None
+
+        owner_id = user_id if re.search(r"\b(i|my)\b", lowered) and any(term in lowered for term in ["share", "shared"]) else None
+        recipient_id = user_id if re.search(r"\b(me)\b", lowered) else None
+
+        if shared_by:
+            owner = QueryService._resolve_user_by_name_or_email(shared_by)
+            if not owner:
+                return {
+                    "answer": f"I couldn't find a user matching '{shared_by}'.",
+                    "sources": [],
+                }
+            owner_id = str(owner.id)
+
+        if shared_with:
+            recipient = QueryService._resolve_user_by_name_or_email(shared_with)
+            if not recipient:
+                return {
+                    "answer": f"I couldn't find a user matching '{shared_with}'.",
+                    "sources": [],
+                }
+            recipient_id = str(recipient.id)
+
+        recipient_user = aliased(User)
+        share_query = (
+            db.session.query(
+                Share.note_id,
+                Share.permission,
+                Note.title.label("note_title"),
+                User.full_name.label("owner_name"),
+                User.email.label("owner_email"),
+                recipient_user.full_name.label("recipient_name"),
+                recipient_user.email.label("recipient_email"),
+            )
+            .join(Note, Note.id == Share.note_id)
+            .join(User, User.id == Note.user_id)
+            .join(recipient_user, recipient_user.id == Share.shared_with_user_id)
+        )
+
+        if owner_id:
+            share_query = share_query.filter(Note.user_id == owner_id)
+        if recipient_id:
+            share_query = share_query.filter(Share.shared_with_user_id == recipient_id)
+
+        share_rows = share_query.order_by(Note.updated_at.desc(), Note.title.asc()).all()
+
+        if not share_rows:
+            return {
+                "answer": "I couldn't find any shared notes matching that request.",
+                "sources": [],
+            }
+
+        if owner_id and recipient_id:
+            if str(owner_id) == str(user_id):
+                target_user = db.session.get(User, recipient_id)
+                target_name = (
+                    target_user.full_name
+                    if target_user and target_user.full_name
+                    else target_user.email
+                    if target_user
+                    else "that user"
+                )
+                intro = f"You shared these notes with {target_name}:"
+            elif str(recipient_id) == str(user_id):
+                owner = db.session.get(User, owner_id)
+                owner_name = (
+                    owner.full_name
+                    if owner and owner.full_name
+                    else owner.email
+                    if owner
+                    else "that user"
+                )
+                intro = f"{owner_name} shared these notes with you:"
+            else:
+                owner = db.session.get(User, owner_id)
+                recipient = db.session.get(User, recipient_id)
+                owner_name = (
+                    owner.full_name
+                    if owner and owner.full_name
+                    else owner.email
+                    if owner
+                    else "that user"
+                )
+                recipient_name = (
+                    recipient.full_name
+                    if recipient and recipient.full_name
+                    else recipient.email
+                    if recipient
+                    else "that user"
+                )
+                intro = f"{owner_name} shared these notes with {recipient_name}:"
+        elif owner_id:
+            owner = db.session.get(User, owner_id)
+            owner_name = (
+                owner.full_name
+                if owner and owner.full_name
+                else owner.email
+                if owner
+                else "that user"
+            )
+            intro = f"Here are the notes shared by {owner_name}:"
+        elif recipient_id:
+            recipient = db.session.get(User, recipient_id)
+            recipient_name = (
+                recipient.full_name
+                if recipient and recipient.full_name
+                else recipient.email
+                if recipient
+                else "that user"
+            )
+            intro = f"Here are the notes shared with {recipient_name}:"
+        else:
+            intro = "Here are the matching shared notes:"
+
+        sources = []
+        lines = [intro]
+        for row in share_rows:
+            recipient_name = row.recipient_name or row.recipient_email
+            permission_value = row.permission.value if hasattr(row.permission, "value") else str(row.permission)
+            lines.append(f"- {row.note_title} ({permission_value})")
+            sources.append({
+                "note_id": str(row.note_id),
+                "note_title": row.note_title,
+                "chunk_text": f"Shared with {recipient_name} as {permission_value}.",
+                "similarity_score": 1.0,
+            })
+
+        return {
+            "answer": "\n".join(lines),
+            "sources": sources,
+        }
 
     @staticmethod
     def _resolve_user_by_name_or_email(name_or_email: str) -> User | None:
@@ -180,6 +367,10 @@ class QueryService:
 
     @staticmethod
     def query(user_id: str, question: str, top_k: int = 5) -> dict:
+        share_listing_response = QueryService._build_share_listing_response(question, user_id)
+        if share_listing_response:
+            return share_listing_response
+
         accessible_note_ids, _, _ = QueryService._get_searchable_note_ids(user_id)
 
         if not accessible_note_ids:

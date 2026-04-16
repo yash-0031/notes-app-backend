@@ -243,3 +243,88 @@ def test_get_index_status_reports_search_window(app):
     assert status["indexed_notes"] == 0
     assert status["pending_notes"] == 1
     assert status["is_ready"] is False
+
+
+def test_query_lists_notes_shared_by_current_user_to_named_recipient():
+    soham = _register_user("share-owner@example.com", "Soham Kulkarni")
+    yash = _register_user("share-recipient@example.com", "Yash Andure")
+
+    first_note = NotesService.create_note(
+        user_id=str(soham.id),
+        title="Final Practical Day Checklist",
+        content="Checklist content",
+    )
+    second_note = NotesService.create_note(
+        user_id=str(soham.id),
+        title="Cloud Lab Viva",
+        content="Viva content",
+    )
+
+    db.session.add_all(
+        [
+            Share(
+                note_id=first_note.id,
+                shared_with_user_id=yash.id,
+                permission=PermissionType.VIEWER,
+            ),
+            Share(
+                note_id=second_note.id,
+                shared_with_user_id=yash.id,
+                permission=PermissionType.EDITOR,
+            ),
+        ]
+    )
+    db.session.commit()
+
+    result = QueryService.query(
+        user_id=str(soham.id),
+        question="Which notes did I share with Yash",
+        top_k=5,
+    )
+
+    assert result["answer"].startswith("You shared these notes with")
+    returned_titles = {source["note_title"] for source in result["sources"]}
+    assert returned_titles == {"Final Practical Day Checklist", "Cloud Lab Viva"}
+
+
+def test_query_lists_notes_shared_by_named_owner_to_current_user():
+    soham = _register_user("share-owner-2@example.com", "Soham Kulkarni")
+    yash = _register_user("share-recipient-2@example.com", "Yash Andure")
+    other_owner = _register_user("share-owner-3@example.com", "Riya Patil")
+
+    note = NotesService.create_note(
+        user_id=str(soham.id),
+        title="Cloud Lab Viva",
+        content="Viva content",
+    )
+    other_note = NotesService.create_note(
+        user_id=str(other_owner.id),
+        title="Compiler Design Revision",
+        content="Other shared note",
+    )
+
+    db.session.add_all(
+        [
+            Share(
+                note_id=note.id,
+                shared_with_user_id=yash.id,
+                permission=PermissionType.VIEWER,
+            ),
+            Share(
+                note_id=other_note.id,
+                shared_with_user_id=yash.id,
+                permission=PermissionType.VIEWER,
+            ),
+        ]
+    )
+    db.session.commit()
+
+    result = QueryService.query(
+        user_id=str(yash.id),
+        question="Which notes did Soham share with me",
+        top_k=5,
+    )
+
+    assert result["answer"].startswith("Here are the notes shared by")
+    returned_titles = {source["note_title"] for source in result["sources"]}
+    assert returned_titles == {"Cloud Lab Viva"}

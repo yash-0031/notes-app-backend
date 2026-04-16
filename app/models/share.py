@@ -64,6 +64,7 @@ class Share(db.Model):
             "id": str(self.id),
             "note_id": str(self.note_id),
             "shared_with_user_id": str(self.shared_with_user_id),
+            "shared_with_email": self.shared_with_user.email if self.shared_with_user else None,
             "permission": self.permission.value,
             "created_at": self.created_at.isoformat(),
         }

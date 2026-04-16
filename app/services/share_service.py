@@ -81,6 +81,28 @@ class ShareService:
         db.session.commit()
 
     @staticmethod
+    def update_share_permission(
+        share_id: str,
+        note_id: str,
+        owner_id: str,
+        permission: str,
+    ) -> Share:
+        note = Note.query.get(note_id)
+        if not note:
+            raise ValueError("Note not found")
+
+        if not is_note_owner(owner_id, note):
+            raise PermissionError("Only the note owner can manage shares")
+
+        share = Share.query.get(share_id)
+        if not share or str(share.note_id) != str(note_id):
+            raise ValueError("Share not found")
+
+        share.permission = PermissionType(permission)
+        db.session.commit()
+        return share
+
+    @staticmethod
     def get_shared_with_me(user_id: str) -> list:
         shared_notes = (
             db.session.query(Note, Share.permission)

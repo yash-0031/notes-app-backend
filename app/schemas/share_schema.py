@@ -12,6 +12,13 @@ class CreateShareSchema(Schema):
     )
 
 
+class UpdateShareSchema(Schema):
+    permission = fields.String(
+        required=True,
+        validate=validate.OneOf(["VIEWER", "EDITOR"]),
+    )
+
+
 class ShareResponseSchema(Schema):
     id = fields.String(dump_only=True)
     note_id = fields.String(dump_only=True)

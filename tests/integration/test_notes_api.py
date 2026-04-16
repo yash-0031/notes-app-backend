@@ -119,13 +119,30 @@ def test_sharing_and_shared_listing(client, auth_headers, second_user_headers):
     share = share_response.get_json()["share"]
     assert share_response.get_json()["note"]["share_count"] == 1
     assert share_response.get_json()["note"]["content"] == "Shared content"
+    assert share["shared_with_email"] == "second.user@example.com"
+
+    list_shares_response = client.get(
+        f"/api/v1/notes/{note['id']}/shares",
+        headers=auth_headers,
+    )
+    assert list_shares_response.status_code == 200
+    assert len(list_shares_response.get_json()["shares"]) == 1
+    assert list_shares_response.get_json()["shares"][0]["permission"] == "VIEWER"
+
+    update_share_response = client.put(
+        f"/api/v1/notes/{note['id']}/share/{share['id']}",
+        json={"permission": "EDITOR"},
+        headers=auth_headers,
+    )
+    assert update_share_response.status_code == 200
+    assert update_share_response.get_json()["share"]["permission"] == "EDITOR"
 
     shared_response = client.get("/api/v1/shared", headers=second_user_headers)
     assert shared_response.status_code == 200
     assert len(shared_response.get_json()["notes"]) == 1
     assert shared_response.get_json()["notes"][0]["id"] == note["id"]
     assert shared_response.get_json()["notes"][0]["content"] == "Shared content"
-    assert shared_response.get_json()["notes"][0]["share_permission"] == "VIEWER"
+    assert shared_response.get_json()["notes"][0]["share_permission"] == "EDITOR"
 
     revoke_response = client.delete(
         f"/api/v1/notes/{note['id']}/share/{share['id']}",

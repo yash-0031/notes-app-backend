@@ -65,6 +65,7 @@ def test_notes_crud_end_to_end(client, auth_headers):
     list_response = client.get("/api/v1/notes", headers=auth_headers)
     assert list_response.status_code == 200
     assert len(list_response.get_json()["notes"]) == 1
+    assert list_response.get_json()["notes"][0]["content"] == "<p>Original content</p>"
 
     get_response = client.get(f"/api/v1/notes/{note['id']}", headers=auth_headers)
     assert get_response.status_code == 200
@@ -121,6 +122,8 @@ def test_sharing_and_shared_listing(client, auth_headers, second_user_headers):
     assert shared_response.status_code == 200
     assert len(shared_response.get_json()["notes"]) == 1
     assert shared_response.get_json()["notes"][0]["id"] == note["id"]
+    assert shared_response.get_json()["notes"][0]["content"] == "Shared content"
+    assert shared_response.get_json()["notes"][0]["share_permission"] == "EDITOR"
 
     revoke_response = client.delete(
         f"/api/v1/notes/{note['id']}/share/{share['id']}",

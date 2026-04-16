@@ -89,8 +89,14 @@ def revoke_share(note_id, share_id):
 def list_shared_notes():
 
     current_user_id = get_jwt_identity()
-    notes = ShareService.get_shared_with_me(user_id=current_user_id)
+    shared_notes = ShareService.get_shared_with_me(user_id=current_user_id)
 
     return jsonify({
-        "notes": [note.to_dict(include_content=False) for note in notes],
+        "notes": [
+            {
+                **note.to_dict(include_content=True),
+                "share_permission": permission.value,
+            }
+            for note, permission in shared_notes
+        ],
     }), 200

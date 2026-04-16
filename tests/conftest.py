@@ -14,7 +14,15 @@ if str(ROOT_DIR) not in sys.path:
 
 
 os.environ.setdefault("REDIS_URL", "memory://")
-os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
+os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
+os.environ.setdefault(
+    "DATABASE_URL",
+    "postgresql://postgres:N0teShareDb9f7Kx2mQ4zP8vL@localhost:5432/noteshare",
+)
+os.environ.setdefault(
+    "TEST_DATABASE_URL",
+    "postgresql://postgres:N0teShareDb9f7Kx2mQ4zP8vL@localhost:5432/noteshare_test",
+)
 
 from app import create_app, db  # noqa: E402
 from app.models import Note, NoteEmbedding, PermissionType, Share, User  # noqa: E402,F401

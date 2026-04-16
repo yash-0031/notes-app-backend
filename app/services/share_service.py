@@ -83,7 +83,7 @@ class ShareService:
     @staticmethod
     def get_shared_with_me(user_id: str) -> list:
         shared_notes = (
-            db.session.query(Note)
+            db.session.query(Note, Share.permission)
             .join(Share, Share.note_id == Note.id)
             .filter(
                 Share.shared_with_user_id == user_id,

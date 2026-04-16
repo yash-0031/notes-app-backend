@@ -22,7 +22,7 @@ celery[redis]==5.4.0
 redis==5.2.1
 
 # AI / Embeddings
-openai==1.58.1
+google-genai==1.30.0
 
 # PDF Processing
 PyMuPDF==1.25.1

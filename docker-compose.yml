@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: noteshare
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -35,9 +35,9 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/noteshare
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -51,9 +51,9 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/noteshare
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -68,9 +68,9 @@ services:
       FLASK_ENV: production
       SECRET_KEY: ${SECRET_KEY}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-postgres}@db:5432/noteshare
+      DATABASE_URL: postgresql://postgres:${DB_PASSWORD:-N0teShareDb9f7Kx2mQ4zP8vL}@db:5432/noteshare
       REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy

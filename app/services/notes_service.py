@@ -76,7 +76,7 @@ class NotesService:
         )
 
         return {
-            "notes": [note.to_dict(include_content=False) for note in paginated.items],
+            "notes": [note.to_dict(include_content=True) for note in paginated.items],
             "pagination": {
                 "page": paginated.page,
                 "per_page": paginated.per_page,

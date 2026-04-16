@@ -42,6 +42,12 @@ def generate_embeddings(self, note_id: str):
             texts = [c["chunk_text"] for c in chunks]
             embeddings = get_embeddings_batch(texts)
 
+            if len(embeddings) != len(chunks):
+                raise ValueError(
+                    f"Embedding count mismatch for note {note_id}: "
+                    f"expected {len(chunks)}, received {len(embeddings)}"
+                )
+
             for chunk_data, embedding_vector in zip(chunks, embeddings):
                 record = NoteEmbedding(
                     note_id=note_id,

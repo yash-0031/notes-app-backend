@@ -90,6 +90,17 @@ class QueryService:
         return any(keyword in lowered for keyword in keywords)
 
     @staticmethod
+    def _build_summary_fallback(sources: list[dict]) -> str:
+        if not sources:
+            return "I couldn't find this information in your notes."
+
+        lines = ["Here is a summary from the matching shared notes:"]
+        for source in sources:
+            snippet = source["chunk_text"].replace("\n", " ").strip()
+            lines.append(f"- {source['note_title']}: {snippet}")
+        return "\n".join(lines)
+
+    @staticmethod
     def get_index_status(user_id: str) -> dict:
 
         accessible_note_ids = get_accessible_note_ids(user_id)
@@ -198,6 +209,13 @@ class QueryService:
         context = "\n\n---\n\n".join(context_pieces)
 
         answer = generate_answer(question, context)
+
+        if (
+            answer == "I couldn't find this information in your notes."
+            and sources
+            and QueryService._is_broad_summary_request(question)
+        ):
+            answer = QueryService._build_summary_fallback(sources)
 
         return {
             "answer": answer,

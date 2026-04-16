@@ -102,3 +102,42 @@ def test_query_filters_shared_by_owner_for_summary(mock_openai):
     assert result["sources"][0]["note_id"] == str(shared_note.id)
     assert result["sources"][0]["note_title"] == "Distributed Systems Revision"
     assert mock_openai["generate_answer"].called
+
+
+def test_query_uses_summary_fallback_when_model_returns_no_text(mock_openai):
+    recipient = _register_user("summary-recipient@example.com", "Summary Recipient")
+    soham = _register_user("summary-soham@example.com", "Soham Kulkarni")
+
+    shared_note = NotesService.create_note(
+        user_id=str(soham.id),
+        title="Cloud Lab Viva",
+        content="Prepare answers on containers, orchestration basics, scaling, and monitoring.",
+    )
+
+    db.session.add(
+        Share(
+            note_id=shared_note.id,
+            shared_with_user_id=recipient.id,
+            permission=PermissionType.VIEWER,
+        )
+    )
+    db.session.add(
+        NoteEmbedding(
+            note_id=shared_note.id,
+            chunk_text="Prepare answers on containers, orchestration basics, scaling, and monitoring.",
+            embedding=[0.1] * 1536,
+            metadata_={"chunk_index": 0},
+        )
+    )
+    db.session.commit()
+
+    mock_openai["generate_answer"].return_value = "I couldn't find this information in your notes."
+
+    result = QueryService.query(
+        user_id=str(recipient.id),
+        question="Summarize everything shared by Soham",
+        top_k=5,
+    )
+
+    assert result["answer"].startswith("Here is a summary from the matching shared notes:")
+    assert "Cloud Lab Viva" in result["answer"]

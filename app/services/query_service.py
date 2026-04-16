@@ -6,6 +6,42 @@ from app.utils.ai_helper import get_embedding, generate_answer
 
 class QueryService:
     @staticmethod
+    def get_index_status(user_id: str) -> dict:
+
+        accessible_note_ids = get_accessible_note_ids(user_id)
+
+        if not accessible_note_ids:
+            return {
+                "total_notes": 0,
+                "indexed_notes": 0,
+                "pending_notes": 0,
+                "is_ready": False,
+            }
+
+        total_notes = (
+            db.session.query(Note.id)
+            .filter(Note.id.in_(accessible_note_ids))
+            .distinct()
+            .count()
+        )
+
+        indexed_notes = (
+            db.session.query(NoteEmbedding.note_id)
+            .filter(NoteEmbedding.note_id.in_(accessible_note_ids))
+            .distinct()
+            .count()
+        )
+
+        pending_notes = max(total_notes - indexed_notes, 0)
+
+        return {
+            "total_notes": total_notes,
+            "indexed_notes": indexed_notes,
+            "pending_notes": pending_notes,
+            "is_ready": total_notes > 0 and pending_notes == 0,
+        }
+
+    @staticmethod
     def query(user_id: str, question: str, top_k: int = 5) -> dict:
 
         accessible_note_ids = get_accessible_note_ids(user_id)

@@ -20,6 +20,24 @@ class QuerySchema(Schema):
 
 query_schema = QuerySchema()
 
+
+@api_v1_blueprint.route("/query/status", methods=["GET"])
+@jwt_required()
+def query_index_status():
+
+    current_user_id = get_jwt_identity()
+
+    try:
+        result = QueryService.get_index_status(user_id=current_user_id)
+    except Exception as err:
+        return jsonify({
+            "error": "QUERY_STATUS_ERROR",
+            "message": f"Failed to load query status: {str(err)}",
+            "status_code": 500,
+        }), 500
+
+    return jsonify(result), 200
+
 @api_v1_blueprint.route("/query", methods=["POST"])
 @jwt_required()
 def query_notes():

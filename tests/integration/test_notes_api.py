@@ -117,13 +117,15 @@ def test_sharing_and_shared_listing(client, auth_headers, second_user_headers):
     )
     assert share_response.status_code == 201, share_response.get_json()
     share = share_response.get_json()["share"]
+    assert share_response.get_json()["note"]["share_count"] == 1
+    assert share_response.get_json()["note"]["content"] == "Shared content"
 
     shared_response = client.get("/api/v1/shared", headers=second_user_headers)
     assert shared_response.status_code == 200
     assert len(shared_response.get_json()["notes"]) == 1
     assert shared_response.get_json()["notes"][0]["id"] == note["id"]
     assert shared_response.get_json()["notes"][0]["content"] == "Shared content"
-    assert shared_response.get_json()["notes"][0]["share_permission"] == "EDITOR"
+    assert shared_response.get_json()["notes"][0]["share_permission"] == "VIEWER"
 
     revoke_response = client.delete(
         f"/api/v1/notes/{note['id']}/share/{share['id']}",

@@ -55,6 +55,7 @@ def share_note(note_id):
     return jsonify({
         "message": "Note shared successfully",
         "share": share.to_dict(),
+        "note": share.note.to_dict(),
     }), 201
 
 @api_v1_blueprint.route("/notes/<note_id>/share/<share_id>", methods=["DELETE"])

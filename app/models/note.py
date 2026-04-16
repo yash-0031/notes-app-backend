@@ -70,6 +70,7 @@ class Note(db.Model):
             "user_id": str(self.user_id),
             "title": self.title,
             "is_archived": self.is_archived,
+            "share_count": len(self.shares),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_at": self.created_at.isoformat(),
         }

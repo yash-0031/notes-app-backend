@@ -80,4 +80,17 @@ Question: {question}"""
     if answer:
         return answer
 
+    for candidate in getattr(response, "candidates", []) or []:
+        content_obj = getattr(candidate, "content", None)
+        parts = getattr(content_obj, "parts", None) or []
+        text_parts = []
+        for part in parts:
+            text_value = getattr(part, "text", None)
+            if text_value:
+                text_parts.append(text_value.strip())
+
+        answer = "\n".join(part for part in text_parts if part).strip()
+        if answer:
+            return answer
+
     return "I couldn't find this information in your notes."

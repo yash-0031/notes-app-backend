@@ -71,6 +71,7 @@ class Note(db.Model):
             "title": self.title,
             "is_archived": self.is_archived,
             "share_count": len(self.shares),
+            "is_indexed": len(self.embeddings) > 0,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "created_at": self.created_at.isoformat(),
         }

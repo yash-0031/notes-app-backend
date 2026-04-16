@@ -14,7 +14,7 @@ docker compose up --build
 
 Then open:
 
-- Backend health: [http://localhost:5000/api/v1/health](http://localhost:5000/api/v1/health)
+- Backend health: [http://localhost:5001/api/v1/health](http://localhost:5001/api/v1/health)
 
 ## What Runs
 
@@ -52,5 +52,6 @@ python3 -c "import secrets; print(secrets.token_urlsafe(48))"
 
 - This compose file is backend-only. It does not run the frontend.
 - The frontend in `/Users/mavenik/Documents/Personal/NoteShare/notes-app` should point to `http://localhost:5000/api/v1` when you use this stack.
+- The frontend in `/Users/mavenik/Documents/Personal/NoteShare/notes-app` should point to `http://localhost:5001/api/v1` when you use this stack.
 - If you want the full stack in one command, use the root compose file in:
   - `/Users/mavenik/Documents/Personal/NoteShare/docker-compose.yml`

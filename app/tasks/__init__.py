@@ -31,3 +31,6 @@ celery_app.conf.beat_schedule = {
 }
 
 celery_app.autodiscover_tasks(["app.tasks"])
+
+# Ensure task modules are imported so Celery workers register named tasks.
+from app.tasks import embedding_tasks  # noqa: E402,F401

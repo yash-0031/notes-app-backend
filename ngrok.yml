@@ -1,0 +1,8 @@
+authtoken: yourTokenHere
+tunnels:
+  first:
+    addr: 3000
+    proto: http
+  second:
+    addr: 5001
+    proto: http

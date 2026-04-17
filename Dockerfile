@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /install /usr/local
 COPY . .
+RUN sed -i 's/\r$//' /app/scripts/*.sh
 RUN chmod +x /app/scripts/*.sh
 
 RUN useradd -m -r appuser && chown -R appuser:appuser /app
